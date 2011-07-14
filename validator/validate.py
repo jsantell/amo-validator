@@ -13,12 +13,9 @@ from validator.constants import PACKAGE_ANY
 def validate(path, format="json",
              approved_applications=os.path.join(os.path.dirname(__file__),
                                                 "app_versions.json"),
-             determined=True,
-             spidermonkey=False,
-             listed=True,
-             expectation=PACKAGE_ANY,
-             for_appversions=None,
-             overrides=None):
+             determined=True, spidermonkey=False, listed=True,
+             expectation=PACKAGE_ANY, for_appversions=None,
+             overrides=None, scrape=False):
     """
     Perform validation in one easy step!
 
@@ -30,6 +27,9 @@ def validate(path, format="json",
     expectation : The type of package that should be expected
     for_appversions : A dict of app GUIDs referencing lists of versions.
                       Determines which version-dependant tests should be run.
+    overrides : A dictionary of values to override validator functions.
+    scrape : When enabled, extra information will be collected about the
+             add-on, including JavaScript source code.
     """
 
     # Load up the target applications
@@ -42,6 +42,8 @@ def validate(path, format="json",
         bundle.overrides = overrides
     if spidermonkey != False:
         bundle.save_resource("SPIDERMONKEY", spidermonkey)
+
+    bundle.save_resource("scrape", scrape)
 
     validator.submain.prepare_package(bundle, path, expectation,
                                       for_appversions=for_appversions)

@@ -101,6 +101,13 @@ def test_identifier(traverser, name):
                               column=traverser.position,
                               context=traverser.context)
 
+    if traverser.err.get_resource("scrape"):
+        js_identifiers = traverser.err.get_resource("js_identifiers")
+        if not js_identifiers:
+            js_identifiers = set()
+        js_identifiers.add(name)
+        traverser.err.save_resource("js_identifiers", js_identifiers)
+
 
 def _function(traverser, node):
     "Prevents code duplication"

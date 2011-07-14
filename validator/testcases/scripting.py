@@ -17,6 +17,16 @@ JS_ESCAPE = re.compile(r"\\+[ux]", re.I)
 def test_js_file(err, filename, data, line=0, context=None):
     "Tests a JS file by parsing and analyzing its tokens"
 
+    # Grab data for stat scraping.
+    if err.get_resource("scrape"):
+        js_blobs = err.get_resource("js")
+        if not js_blobs:
+            js_blobs = []
+        js_blobs.append({"filename": filename,
+                         "line": line,
+                         "blob": data})
+        err.save_resource("js", js_blobs)
+
     if SPIDERMONKEY_INSTALLATION is None or \
        err.get_resource("SPIDERMONKEY") is None:  # Default value is False
         return
@@ -69,7 +79,7 @@ def test_js_snippet(err, data, filename, line=0, context=None):
 
     # Wrap snippets in a function to prevent the parser from freaking out
     # when return statements exist without a corresponding function.
-    data = "(function(){%s\n})()" % data
+    data = "(function(){%s\n})()/*scraped*/" % data
 
     test_js_file(err, filename, data, line, context)
 
