@@ -323,6 +323,11 @@ class ErrorBundle(object):
             notice["type"] = "notice"
             messages.append(notice)
 
+        if self.get_resource("scrape"):
+            output["js"] = self.get_resource("js")
+            output["js_identifiers"] = \
+                    list(self.get_resource("js_identifiers"))
+
         # Output the JSON.
         return json.dumps(output)
 

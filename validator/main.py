@@ -88,6 +88,10 @@ def main():
                         compatibility tests:
                         {"{ec8030f7-c20a-464f-9b0e-13a3a9e97384}": ["6.*"]}
                         """)
+    parser.add_argument("--scrape",
+                        action="store_const",
+                        const=True,
+                        help="If set, JS will be scraped from the add-on.")
 
     args = parser.parse_args()
 
@@ -117,6 +121,10 @@ def main():
                             listed=not args.selfhosted,
                             overrides=overrides,
                             for_appversions=for_appversions)
+
+    # If we're scraping JS, put it in the error bundle.
+    if args.scrape:
+        error_bundle.save_resource("scrape", args.scrape, pushable=False)
 
     # Print the output of the tests based on the requested format.
     if args.output == "text":

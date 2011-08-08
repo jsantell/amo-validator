@@ -43,7 +43,7 @@ def validate(path, format="json",
     if spidermonkey != False:
         bundle.save_resource("SPIDERMONKEY", spidermonkey)
 
-    bundle.save_resource("scrape", scrape)
+    bundle.save_resource("scrape", scrape, pushable=False)
 
     validator.submain.prepare_package(bundle, path, expectation,
                                       for_appversions=for_appversions)
