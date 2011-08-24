@@ -139,7 +139,60 @@ def nsIDOMFile_deprec(args, traverser, node, wrapper):
     cd_nsIDOMFile_deprec(None, [], traverser)
 
 
-INSTANCE_DEFINITIONS = {"createElement": createElement,
+XUL_ONLY_EVENTS = ("DOMMouseScroll", "dragdrop", "dragexit", "draggexture",
+                   "CheckboxStateChange", "RadioStateChange", "command",
+                   "input", "DOMMenuItemActive", "DOMMenuItemInactive",
+                   "contextmenu", "overflow", "overflowchanged", "underflow",
+                   "popuphidden", "popuphiding", "popupshowing", "popupshown",
+                   "broadcast", "commandupdate", )
+
+
+def addEventListener(args, traverser, node, wrapper):
+    """
+    Ensure that event listeners are only created for chrome contexts for XUL-
+    only events.
+    """
+    traverser._debug("ADDEVENTLISTENER>>%s" % wrapper.context)
+
+    # TODO: Add URL to more informaiton
+    if wrapper.context != "chrome":
+        traverser.err.warning(
+            err_id=("testcases_javascript_instanceactions",
+                    "addEventListener", "e10s_content_warning"),
+            warning="Event listeners on content events are incompatible with "
+                    "multiple processes.",
+            description="Events on content elements may not be handled in a "
+                        "chrome context.",
+            filename=traverser.filename,
+            line=traverser.line,
+            column=traverser.position,
+            context=traverser.context,
+            compatibility_type="warning")
+    else:
+        if not args:
+            return
+
+        simple_args = [traverser._traverse_node(a) for a in args]
+        listener_type = simple_args[0]
+        listener_type = unicode(listener_type.get_literal_value())
+
+        if listener_type not in XUL_ONLY_EVENTS:
+            traverser.err.warning(
+                err_id=("testcases_javascript_instanceactions",
+                        "addEventListener", "e10s_chrome_event_warning"),
+                warning="Event listeners on chrome events may only be set for "
+                        "XUL-only events.",
+                description="Event listeners may not be compatible with "
+                            "e10s.",
+                filename=traverser.filename,
+                line=traverser.line,
+                column=traverser.position,
+                context=traverser.context,
+                compatibility_type="warning")
+
+
+INSTANCE_DEFINITIONS = {"addEventListener": addEventListener,
+                        "createElement": createElement,
                         "createElementNS": createElementNS,
                         "getInterface": getInterface,
                         "setAttribute": setAttribute,
