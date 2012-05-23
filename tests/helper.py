@@ -1,6 +1,5 @@
 import os
 import sys
-import unittest
 
 from validator.submain import populate_chrome_manifest
 from validator.rdf import RDFParser
@@ -42,7 +41,7 @@ def _do_test(path, test, failure=True,
     return err
 
 
-class TestCase(unittest.TestCase):
+class TestCase(object):
     def setUp(self):
         self.err = None
         self.is_jetpack = False
