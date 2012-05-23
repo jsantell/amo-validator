@@ -1,59 +1,78 @@
 import validator.testcases.markup.csstester as csstester
-from validator.errorbundler import ErrorBundle
 
-def _do_test(path, should_fail=False):
-
-    data = open(path).read()
-    err = ErrorBundle()
-
-    csstester.test_css_file(err, "css.css", data)
-    err.print_summary(True)
-
-    if should_fail:
-        assert err.failed()
-    else:
-        assert not err.failed()
-
-    return err
+from helper import TestCase
 
 
-def test_css_file():
-    "Tests a package with a valid CSS file."
+class TestCSSTestCases(TestCase):
+    """
+    Test that the CSS test cases are properly flagging unscrupulous CSS
+    snippets.
+    """
 
-    _do_test("tests/resources/markup/csstester/pass.css")
+    def _test_file(self, path):
+        """Test a CSS file for errors."""
+        with open(path) as css_file:
+            self._test_snippet(css_file.read())
 
+    def _test_snippet(self, data):
+        """Test a snippet of CSS for errors."""
+        if self.err is None:
+            self.setup_err()
 
-def test_css_moz_binding():
-    "Tests that remote scripts in CSS are blocked."
+        csstester.test_css_file(self.err, "css.css", data)
 
-    _do_test("tests/resources/markup/csstester/mozbinding.css", True)
-    _do_test("tests/resources/markup/csstester/mozbinding-pass.css", False)
+    def test_pass(self):
+        """Test that a valid CSS file is not flagged."""
+        self._test_file("tests/resources/markup/csstester/pass.css")
+        self.assert_silent()
 
+    def test_css_moz_binding_remote(self):
+        """Test that remote scripts in moz-binding are blocked."""
+        self._test_file("tests/resources/markup/csstester/mozbinding.css")
+        self.assert_failed(with_warnings=True)
 
-def test_css_identitybox():
-    "Tests that the identity box isn't played with."
+    def test_css_moz_binding_local(self):
+        """Test that local scripts in moz-binding are not flagged."""
+        self._test_file("tests/resources/markup/csstester/mozbinding-pass.css")
+        self.assert_silent()
 
-    _do_test("tests/resources/markup/csstester/identity-box.css", True)
+    def test_css_identitybox(self):
+        """Test that modifications to the identity box are flagged."""
+        self._test_file("tests/resources/markup/csstester/identity-box.css")
+        self.assert_failed(with_warnings=True)
 
+    def test_css_remote_urls(self):
+        """Test that remote URLs within CSS are flagged."""
 
-def test_remote_urls():
-    "Tests the Regex used to detect remote URLs"
+        is_remote_url = lambda s: csstester.BAD_URL.match(s) is not None
 
-    t = lambda s:csstester.BAD_URL.match(s) is not None
+        def passes(snippet):
+            def wrap(snippet):
+                assert not is_remote_url(snippet), \
+                        "`%s` should not be flagged as remote."
+            return wrap, snippet
 
-    assert not t("url(foo/bar.abc)")
-    assert not t('url("foo/bar.abc")')
-    assert not t("url('foo/bar.abc')")
+        def fails(snippet):
+            def wrap(snippet):
+                assert is_remote_url(snippet), \
+                        "`%s` should be flagged as remote."
+            return wrap, snippet
 
-    assert not t("url(chrome://foo/bar)")
-    assert not t("url(resource:asdf)")
+        yield passes("url(foo/bar.abc)")
+        yield passes('url("foo/bar.abc")')
+        yield passes("url('foo/bar.abc')")
 
-    assert t("url(http://abc.def)")
-    assert t("url(https://abc.def)")
-    assert t("url(ftp://abc.def)")
-    assert t("url(//abcdef)")
-    assert not t("url(/abc.def)")
+        yield passes("url(chrome://foo/bar)")
+        yield passes("url(resource:asdf)")
 
-    assert not t("UrL(/abc.def)")
-    assert t("url(HTTP://foo.bar/)")
+        yield fails("url(http://abc.def)")
+        yield fails("url(https://abc.def)")
+        yield fails("url(ftp://abc.def)")
+        yield fails("url(//abcdef)")
+        yield passes("url(/abc.def)")
+
+        yield passes("UrL(/abc.def)")
+        yield fails("url(HTTP://foo.bar/)")
+
+    def test_css_
 
