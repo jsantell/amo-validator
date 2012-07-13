@@ -57,6 +57,9 @@ def test_js_file(err, filename, data, line=0, context=None, pollutable=False):
     t.pollutable = pollutable
     t.run(tree)
 
+    # Test for minification
+
+
     # Reset the tier so we don't break the world
     if err is not None:
         err.set_tier(before_tier)
