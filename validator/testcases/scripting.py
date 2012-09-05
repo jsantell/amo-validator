@@ -15,11 +15,36 @@ JS_ESCAPE = re.compile(r"\\+[ux]", re.I)
 
 
 def test_js_file(err, filename, data, line=0, context=None, pollutable=False):
-    "Tests a JS file by parsing and analyzing its tokens"
+    """Test a JS file by parsing and analyzing its tokens."""
 
     if SPIDERMONKEY_INSTALLATION is None or \
        err.get_resource("SPIDERMONKEY") is None:  # Default value is False
         return
+
+    tree = get_tree(
+        data, filename=filename, err=err,
+        shell=(err and err.get_resource("SPIDERMONKEY")) or
+              SPIDERMONKEY_INSTALLATION)
+
+    if not tree:
+        return
+
+    return test_js_tree(err, filename, data, tree, line, context, pollutable)
+
+
+def test_js_tree(err, filename, data, tree, line=0, context=None,
+                 pollutable=False):
+    """Test a JS file's parse tree."""
+
+    before_tier = None
+    # Set the tier to 4 (Security Tests)
+    if err is not None:
+        before_tier = err.tier
+        err.set_tier(3)
+
+    # Generate a context if one is not available.
+    if context is None:
+        context = ContextGenerator(data)
 
     if err.detected_type == PACKAGE_THEME:
         err.warning(
@@ -31,29 +56,9 @@ def test_js_file(err, filename, data, line=0, context=None, pollutable=False):
                 filename=filename,
                 line=line)
 
-    before_tier = None
-    # Set the tier to 4 (Security Tests)
-    if err is not None:
-        before_tier = err.tier
-        err.set_tier(3)
-
-    tree = get_tree(data,
-                    filename=filename,
-                    shell=(err and err.get_resource("SPIDERMONKEY")) or
-                          SPIDERMONKEY_INSTALLATION,
-                    err=err)
-    if not tree:
-        if before_tier:
-            err.set_tier(before_tier)
-        return
-
-    # Generate a context if one is not available.
-    if context is None:
-        context = ContextGenerator(data)
-
-    t = traverser.Traverser(err, filename, line, context=context,
-                            is_jsm=filename.endswith(".jsm") or
-                                   "EXPORTED_SYMBOLS" in data)
+    t = traverser.Traverser(
+        err, filename, line, context=context,
+        is_jsm=filename.endswith(".jsm") or "EXPORTED_SYMBOLS" in data)
     t.pollutable = pollutable
     t.run(tree)
 
@@ -65,7 +70,7 @@ def test_js_file(err, filename, data, line=0, context=None, pollutable=False):
 def test_js_snippet(err, data, filename, line=0, context=None):
     "Process a JS snippet by passing it through to the file tester."
 
-    if not data:
+    if not data.strip():
         return
 
     # Wrap snippets in a function to prevent the parser from freaking out

@@ -1,13 +1,17 @@
+from collections import defaultdict
 import fnmatch
 import hashlib
 import re
 from StringIO import StringIO
+from threading import Semaphore, Thread
 
 from regex import run_regex_tests
+from validator.constants import MAX_JS_FORKS, SPIDERMONKEY_INSTALLATION
 from validator.contextgenerator import ContextGenerator
 from validator import decorator
 from validator import submain as testendpoint_validator
 from validator import unicodehelper
+from validator.testcases.javascript.spidermonkey import get_tree
 import validator.testcases.markup.markuptester as testendpoint_markup
 import validator.testcases.markup.csstester as testendpoint_css
 import validator.testcases.scripting as testendpoint_js
@@ -184,12 +188,50 @@ def test_packed_packages(err, xpi_package=None):
     return processed_files
 
 
+def map_scripts(package, scripts, err, shell):
+    workers = []
+    script_data = defaultdict(dict)
+
+    sem = Semaphore(MAX_JS_FORKS)
+
+    def worker(path):
+        # Get the file data and save it.
+        file_data = unicodehelper.decode(package.read(path))
+        script_data[path]["data"] = file_data
+
+        # Get the tree data and save it.
+        sem.acquire()
+        tree = get_tree(file_data, err, path, shell)
+        sem.release()
+        script_data[path]["tree"] = tree
+
+        # Run the regex tests on the script.
+        run_regex_tests(file_data, err, path, is_js=True)
+
+    for path in scripts:
+        th = Thread(target=worker, args=(path, ))
+        workers.append(th)
+        th.start()
+
+    # Join all the threads back up.
+    for worker in workers:
+        # Join workers with a five-second timeout.
+        worker.join()
+
+    return script_data
+
+
 @decorator.register_test(tier=3)
 def test_packed_scripts(err, xpi_package):
     """
     Scripts must be tested separately from normal files to allow for markup
     files to mark scripts as being potentially polluting.
     """
+
+    if SPIDERMONKEY_INSTALLATION is None or \
+       err.get_resource("SPIDERMONKEY") is None:  # Default value is False
+        return
+    shell = err.get_resource("SPIDERMONKEY") or SPIDERMONKEY_INSTALLATION
 
     # This test doesn't apply to subpackages. We keep references to the
     # subpackage bundles so we can process everything at once in an unpushed
@@ -218,21 +260,22 @@ def test_packed_scripts(err, xpi_package):
         for archive in script_bundle["state"]:
             err.push_state(archive)
 
-        for script in script_bundle["scripts"]:
-            file_data = unicodehelper.decode(package.read(script))
+        # Asynchronously parse all of the scripts.
+        scripts = map_scripts(package, script_bundle["scripts"], err, shell)
+        for script, script_data in scripts.items():
 
             if marked_scripts:
-                reversed_script = chrome.reverse_lookup(script_bundle["state"],
-                                                        script)
+                reversed_script = chrome.reverse_lookup(
+                    script_bundle["state"], script)
                 # Run the standard script tests on the script, but mark the
                 # script as pollutable if its chrome URL is marked as being so.
-                testendpoint_js.test_js_file(
-                        err, script, file_data,
+                testendpoint_js.test_js_tree(
+                        err, script, script_data["data"], script_data["tree"],
                         pollutable=reversed_script in marked_scripts)
             else:
                 # Run the standard script tests on the scripts.
-                testendpoint_js.test_js_file(err, script, file_data)
-            run_regex_tests(file_data, err, script, is_js=True)
+                testendpoint_js.test_js_tree(
+                    err, script, script_data["data"], script_data["tree"])
 
         for i in range(len(script_bundle["state"])):
             err.pop_state()
