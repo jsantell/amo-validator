@@ -194,9 +194,9 @@ def map_scripts(package, scripts, err, shell):
 
     sem = Semaphore(MAX_JS_FORKS)
 
-    def worker(path):
+    def worker(path, data):
         # Get the file data and save it.
-        file_data = unicodehelper.decode(package.read(path))
+        file_data = unicodehelper.decode(data)
         script_data[path]["data"] = file_data
 
         # Get the tree data and save it.
@@ -209,7 +209,8 @@ def map_scripts(package, scripts, err, shell):
         run_regex_tests(file_data, err, path, is_js=True)
 
     for path in scripts:
-        th = Thread(target=worker, args=(path, ))
+        data = package.read(path)
+        th = Thread(target=worker, args=(path, data, ))
         workers.append(th)
         th.start()
 
